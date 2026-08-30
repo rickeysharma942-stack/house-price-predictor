@@ -50,7 +50,6 @@ This project estimates the price of a house/apartment based on property details 
 ```
 ├── app.py                    # Streamlit application
 ├── xgb_housing_model.json    # Trained XGBoost model
-├── requirements.txt          # Python dependencies
 └── README.md
 ```
 
@@ -60,8 +59,8 @@ This project estimates the price of a house/apartment based on property details 
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/<your-username>/<your-repo-name>.git
-   cd <your-repo-name>
+   git clone https://github.com/rickeysharma942-stack/house-price-predictor
+   cd house-price-predictor
    ```
 
 2. **Create a virtual environment (recommended)**
@@ -104,7 +103,7 @@ This project estimates the price of a house/apartment based on property details 
 
 ## 📊 Dataset
 
-The model was trained on an Indian housing dataset containing property listings with details like location, size, amenities, and pricing. *(Add a link/citation to your dataset source here if it's public.)*
+The model was trained on an Indian housing dataset containing property listings with details like location, size, amenities, and pricing.
 
 ---
 
@@ -116,6 +115,6 @@ This project is licensed under the [MIT License](LICENSE).
 
 ## 🙋 Author
 
-**[Your Name]**
-📧 [your-email@example.com](mailto:your-email@example.com)
-🔗 [LinkedIn](#) · [GitHub](#)
+**Rickey Sharma**
+📧 rickeysharma942@gmail.com
+🔗 [GitHub](#)
