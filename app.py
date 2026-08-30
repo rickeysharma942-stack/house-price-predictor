@@ -3,10 +3,10 @@ import pandas as pd
 import numpy as np
 import streamlit as st
 import xgboost as xgb
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
 
+# ─────────────────────────────────────────────────────────────────────────
 # Page Configuration
+# ─────────────────────────────────────────────────────────────────────────
 st.set_page_config(
     page_title="India Housing Price Predictor",
     page_icon="🏠",
@@ -18,85 +18,49 @@ st.write("Predict property prices in Lakhs (INR) using dataset features.")
 
 DATA_FILE = "cleaned_india_housing_prices.csv"
 MODEL_FILE = "xgb_housing_model.json"
-FEATURE_NAMES_FILE = "feature_names.json"
 LOCALITY_MAP_FILE = "locality_mapping.csv"
 
+
+# ─────────────────────────────────────────────────────────────────────────
+# Load the pretrained model (no retraining — the model file already exists)
+# ─────────────────────────────────────────────────────────────────────────
+@st.cache_resource
+def load_model():
+    if not os.path.exists(MODEL_FILE):
+        st.error(f"Model file '{MODEL_FILE}' not found in the repo.")
+        st.stop()
+    model = xgb.XGBRegressor()
+    model.load_model(MODEL_FILE)
+    return model
+
+
 @st.cache_data
-def load_and_preprocess_data():
-    """Loads dataset and performs feature engineering & encoding."""
+def load_reference_data():
+    """Loads the raw dataset (for dropdown options) and the locality name mapping."""
     if not os.path.exists(DATA_FILE):
-        st.error(f"Dataset file '{DATA_FILE}' not found in current directory.")
+        st.error(f"Dataset file '{DATA_FILE}' not found in the repo.")
         st.stop()
-        
-    df = pd.read_csv(DATA_FILE)
-    
-    # Keep the ORIGINAL dataset/model features unchanged.
-    # Real locality names are used only for the Streamlit UI.
     if not os.path.exists(LOCALITY_MAP_FILE):
-        st.error(f"Locality mapping file '{LOCALITY_MAP_FILE}' not found in current directory.")
+        st.error(f"Locality mapping file '{LOCALITY_MAP_FILE}' not found in the repo.")
         st.stop()
+
+    raw_df = pd.read_csv(DATA_FILE)
     locality_map = pd.read_csv(LOCALITY_MAP_FILE)
     locality_map = locality_map[['City', 'Original_Locality_ID', 'Locality']].drop_duplicates()
-    
-    # Process multi-label Amenities into individual binary columns
-    amenities_list = ['Garden', 'Playground', 'Clubhouse', 'Gym', 'Pool']
-    for amenity in amenities_list:
-        df[f"Amenity_{amenity}"] = df['Amenities'].astype(str).apply(lambda x: 1 if amenity in x else 0)
-        
-    # Drop raw text or redundant columns
-    df_processed = df.drop(columns=['ID', 'Amenities'])
-    
-    # One-Hot Encoding for categorical features
-    categorical_cols = [
-        'State', 'City', 'Locality', 'Property_Type', 'Furnished_Status',
-        'Public_Transport_Accessibility', 'Parking_Space', 'Security',
-        'Facing', 'Owner_Type', 'Availability_Status'
-    ]
-    
-    df_encoded = pd.get_dummies(df_processed, columns=categorical_cols, drop_first=False)
-    
-    return df, df_encoded, locality_map
+    return raw_df, locality_map
 
-@st.cache_resource
-def train_or_load_model(df_encoded):
-    """Trains an XGBoost regression model if not cached, otherwise loads it."""
-    X = df_encoded.drop(columns=['Price_in_Lakhs'])
-    y = df_encoded['Price_in_Lakhs']
-    feature_names = X.columns.tolist()
 
-    model = xgb.XGBRegressor(
-        n_estimators=100,
-        learning_rate=0.1,
-        max_depth=6,
-        random_state=42,
-        n_jobs=-1
-    )
+model = load_model()
+feature_names = model.get_booster().feature_names
+raw_df, locality_map = load_reference_data()
 
-    if not os.path.exists(MODEL_FILE):
-        with st.spinner("Training XGBoost regression model on dataset..."):
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-            model.fit(X_train, y_train)
-            model.save_model(MODEL_FILE)
-            
-            y_pred = model.predict(X_test)
-            r2 = r2_score(y_test, y_pred)
-            rmse = np.sqrt(mean_squared_error(y_test, y_pred))
-            st.sidebar.success(f"Model Trained! R² Score: {r2:.3f} | RMSE: {rmse:.2f}")
-    else:
-        model.load_model(MODEL_FILE)
-        st.sidebar.success("Model loaded from saved file!")
-
-    return model, feature_names
-
-# Load data and prepare model
-raw_df, encoded_df, locality_map = load_and_preprocess_data()
-model, feature_names = train_or_load_model(encoded_df)
-
-st.sidebar.header("📊 Dataset Overview")
-st.sidebar.write(f"**Total Records:** {len(raw_df):,}")
+st.sidebar.header("📊 Model Info")
 st.sidebar.write(f"**Total Model Features:** {len(feature_names)}")
+st.sidebar.write(f"**Reference Records:** {len(raw_df):,}")
 
+# ─────────────────────────────────────────────────────────────────────────
 # UI Inputs
+# ─────────────────────────────────────────────────────────────────────────
 st.subheader("📋 Property Details")
 
 col1, col2, col3 = st.columns(3)
@@ -104,24 +68,21 @@ col1, col2, col3 = st.columns(3)
 with col1:
     state_list = sorted(raw_df['State'].unique().tolist())
     selected_state = st.selectbox("State", state_list)
-    
+
     # Filter cities based on selected state
     available_cities = sorted(raw_df[raw_df['State'] == selected_state]['City'].unique().tolist())
     selected_city = st.selectbox("City", available_cities)
-    
-    # Show REAL locality names in the UI, while keeping the original
-    # Locality_### values internally so the original model remains unchanged.
+
+    # Show REAL locality names in the UI, map back to the original Locality_### id
     city_locality_map = locality_map[locality_map['City'] == selected_city]
     available_localities = sorted(city_locality_map['Locality'].dropna().unique().tolist())
     selected_locality_name = st.selectbox("Locality", available_localities)
-    
-    # Convert the selected real name back to the original Locality_### value
-    # expected by the original one-hot encoded model.
+
     matching_ids = city_locality_map.loc[
         city_locality_map['Locality'] == selected_locality_name, 'Original_Locality_ID'
     ].tolist()
     selected_locality = matching_ids[0] if matching_ids else None
-    
+
     property_type = st.selectbox("Property Type", sorted(raw_df['Property_Type'].unique().tolist()))
 
 with col2:
@@ -161,10 +122,13 @@ with col_c:
     has_gym = st.checkbox("Gym")
     has_pool = st.checkbox("Pool")
 
+
+# ─────────────────────────────────────────────────────────────────────────
 # Feature Vector Construction
+# ─────────────────────────────────────────────────────────────────────────
 def construct_input_dataframe():
     input_dict = {feat: 0.0 for feat in feature_names}
-    
+
     # Numeric features
     input_dict['BHK'] = float(bhk)
     input_dict['Size_in_SqFt'] = float(size_sqft)
@@ -175,7 +139,7 @@ def construct_input_dataframe():
     input_dict['Age_of_Property'] = float(age_of_property)
     input_dict['Nearby_Schools'] = float(nearby_schools)
     input_dict['Nearby_Hospitals'] = float(nearby_hospitals)
-    
+
     # Amenities
     input_dict['Amenity_Garden'] = 1.0 if has_garden else 0.0
     input_dict['Amenity_Playground'] = 1.0 if has_playground else 0.0
@@ -183,7 +147,7 @@ def construct_input_dataframe():
     input_dict['Amenity_Gym'] = 1.0 if has_gym else 0.0
     input_dict['Amenity_Pool'] = 1.0 if has_pool else 0.0
 
-    # Categorical OHE columns setting
+    # Categorical one-hot columns — only set the ones the model actually has
     cat_mappings = [
         f"State_{selected_state}",
         f"City_{selected_city}",
@@ -195,21 +159,31 @@ def construct_input_dataframe():
         f"Security_{security}",
         f"Facing_{facing}",
         f"Owner_Type_{owner_type}",
-        f"Availability_Status_{availability_status}"
+        f"Availability_Status_{availability_status}",
     ]
-    
+
+    unmatched = [key for key in cat_mappings if key not in input_dict]
+    if unmatched:
+        st.warning(
+            "These selections don't match any column the model was trained on, "
+            f"so they'll be ignored: {unmatched}"
+        )
+
     for key in cat_mappings:
         if key in input_dict:
             input_dict[key] = 1.0
-            
+
     return pd.DataFrame([input_dict], columns=feature_names)
 
-# Real-time Prediction Execution
+
+# ─────────────────────────────────────────────────────────────────────────
+# Prediction
+# ─────────────────────────────────────────────────────────────────────────
 st.markdown("---")
 if st.button("Predict Property Price 🚀", type="primary", use_container_width=True):
     input_df = construct_input_dataframe()
     predicted_price = model.predict(input_df)[0]
-    
+
     st.subheader("🎯 Estimated Price Result")
     col_res1, col_res2 = st.columns(2)
     with col_res1:
