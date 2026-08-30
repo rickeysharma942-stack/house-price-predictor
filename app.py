@@ -18,8 +18,28 @@ st.title("🏠 India Housing Price Prediction App")
 st.write("Predict property prices in Lakhs (INR) using dataset features.")
 
 DATA_FILE = "cleaned_india_housing_prices.csv"
+DATA_ZIP_FILE = "cleaned_india_housing_prices.zip"
 MODEL_FILE = "xgb_housing_model.json"
 LOCALITY_MAP_FILE = "locality_mapping.csv"
+
+
+def ensure_data_file_extracted():
+    """If the CSV isn't present but the zip is, extract the CSV from the zip."""
+    if os.path.exists(DATA_FILE):
+        return
+    if not os.path.exists(DATA_ZIP_FILE):
+        return  # neither exists — load_reference_data will show the proper error
+
+    with zipfile.ZipFile(DATA_ZIP_FILE, "r") as zf:
+        csv_members = [n for n in zf.namelist() if n.lower().endswith(".csv")]
+        if not csv_members:
+            st.error(f"No CSV file found inside '{DATA_ZIP_FILE}'.")
+            st.stop()
+        # Prefer an entry matching DATA_FILE's name, else just take the first CSV
+        member = DATA_FILE if DATA_FILE in csv_members else csv_members[0]
+        zf.extract(member, path=".")
+        if member != DATA_FILE:
+            os.rename(member, DATA_FILE)
 
 
 # ─────────────────────────────────────────────────────────────────────────
@@ -38,8 +58,9 @@ def load_model():
 @st.cache_data
 def load_reference_data():
     """Loads the raw dataset (for dropdown options) and the locality name mapping."""
+    ensure_data_file_extracted()
     if not os.path.exists(DATA_FILE):
-        st.error(f"Dataset file '{DATA_FILE}' not found in the repo.")
+        st.error(f"Neither '{DATA_FILE}' nor '{DATA_ZIP_FILE}' was found in the repo.")
         st.stop()
     if not os.path.exists(LOCALITY_MAP_FILE):
         st.error(f"Locality mapping file '{LOCALITY_MAP_FILE}' not found in the repo.")
