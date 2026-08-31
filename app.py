@@ -9,12 +9,12 @@ import xgboost as xgb
 # Page Configuration
 # ─────────────────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="India Housing Price Predictor",
+    page_title="Indian House Price Predictor",
     page_icon="🏠",
     layout="wide"
 )
 
-st.title("🏠 India Housing Price Prediction App")
+st.title("🏠 Indian House Price Prediction App")
 st.write("Predict property prices in Lakhs (INR) using dataset features.")
 
 DATA_FILE = "cleaned_india_housing_prices.csv"
