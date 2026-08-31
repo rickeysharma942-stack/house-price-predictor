@@ -2,7 +2,7 @@
 
 A machine learning web app that predicts residential property prices across India using an **XGBoost regression model**, deployed with **Streamlit**.
 
-🔗 **Live App:** https://house-price-predictor-be7owr6ewm2garpghv7vpe.streamlit.app/
+🔗 **Live App:** https://house-price-predictor-l3qnc9apfrtqezmgmfhfbm.streamlit.app/
 
 ---
 
